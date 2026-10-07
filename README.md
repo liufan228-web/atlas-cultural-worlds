@@ -1,19 +1,18 @@
 # ATLAS — Cultural World Models
 
-Prototype 0.1: Berlin 1994 Cultural Constellation.
+Prototype 0.2: **Berlin 1989–1995 / Cultural Constellation**.
+
+This version introduces a 30-entity cultural graph, animated reorientation around the selected entity, relation explanations (WHY), source/status layers (SOURCE), connected-entity exploration, and expanded search.
 
 ## Run locally
+
 ```bash
 npm install
 npm run dev
 ```
-Open http://localhost:3000
 
-## Deploy to Vercel
-1. Upload these files to your GitHub repository `atlas-cultural-worlds`.
-2. In Vercel choose **Add New → Project**.
-3. Import the GitHub repository.
-4. Framework should be detected as **Next.js**.
-5. Click **Deploy**.
+## Deploy
 
-The cultural data in this prototype is illustrative and should be source-checked before being presented as a scholarly/public database.
+Push to the GitHub repository connected to Vercel. Vercel will redeploy automatically.
+
+ATLAS distinguishes between **DOCUMENTED** historical entities and **RECONSTRUCTED** contextual synthesis. Precise archival citations remain a future research layer.
