@@ -1,47 +1,43 @@
-'use client'
-import {useMemo,useState} from 'react'
-import {nodes,edges} from '../data/atlas'
+'use client';
+import {useMemo,useState} from 'react';
+import {artifacts,relations} from '../data/atlas';
 
-const byId=id=>nodes.find(n=>n.id===id)
-function neighborhood(root){
- const one=edges.filter(e=>e.source===root||e.target===root).map(e=>e.source===root?e.target:e.source)
- const two=[...new Set(one.flatMap(id=>edges.filter(e=>e.source===id||e.target===id).map(e=>e.source===id?e.target:e.source)))]
- return {one:[...new Set(one)],two:two.filter(id=>id!==root&&!one.includes(id))}
-}
-function layout(root){
- const {one,two}=neighborhood(root), pos={[root]:{x:50,y:50}}
- const ring=(ids,radius,offset=0)=>ids.forEach((id,i)=>{let a=(Math.PI*2*i/Math.max(ids.length,1))+offset;pos[id]={x:50+Math.cos(a)*radius,y:50+Math.sin(a)*radius*.72}})
- ring(one,27,-Math.PI/2); ring(two.slice(0,14),43,-Math.PI/2+.18)
- nodes.filter(n=>!pos[n.id]).forEach((n,i)=>{let a=Math.PI*2*i/Math.max(nodes.length-one.length-two.length-1,1);pos[n.id]={x:50+Math.cos(a)*48,y:50+Math.sin(a)*47}})
- return pos
-}
-export default function Home(){
- const [selected,setSelected]=useState('berlin'),[panel,setPanel]=useState('overview'),[query,setQuery]=useState('')
- const current=byId(selected), positions=useMemo(()=>layout(selected),[selected]), near=useMemo(()=>neighborhood(selected),[selected])
- const visible=new Set([selected,...near.one,...near.two.slice(0,14)])
- const connected=edges.filter(e=>e.source===selected||e.target===selected)
- const filtered=query?nodes.filter(n=>(n.name+' '+n.type+' '+n.desc).toLowerCase().includes(query.toLowerCase())).slice(0,8):[]
- const choose=id=>{setSelected(id);setPanel('overview')}
+const byId = Object.fromEntries(artifacts.map(a=>[a.id,a]));
+
+export default function Page(){
+ const [active,setActive]=useState('berlin');
+ const [trail,setTrail]=useState(['berlin']);
+ const [panel,setPanel]=useState('WHY');
+ const [zoom,setZoom]=useState(0);
+ const item=byId[active];
+ const related=relations.filter(r=>r.from===active||r.to===active);
+ const nextSurprise = active==='bauhaus'?'berlin':(related[0] ? byId[related[0].from===active?related[0].to:related[0].from] : byId.berlin);
+ const visible=useMemo(()=>artifacts.map((a,i)=>({...a,dx:(a.x-50)*(1+zoom*.22),dy:(a.y-50)*(1+zoom*.22),scale:a.id===active?1.18:1})),[active,zoom]);
+ function visit(id){setActive(id);setTrail(t=>t[t.length-1]===id?t:[...t,id].slice(-8));setPanel('WHY');}
+ function takeMe(){const idx=artifacts.findIndex(a=>a.id===active); visit(artifacts[(idx+1)%artifacts.length].id);}
  return <main>
-  <header><div className="brand">ATLAS<span>CULTURAL WORLD MODELS</span></div><div className="edition">BERLIN / 1989—1995<br/><small>PROTOTYPE 0.2</small></div></header>
-  <section className="hero"><div><p className="eyebrow">EXPLORE A CULTURAL WORLD</p><h1>Culture is not a list.<br/>It is a <i>network.</i></h1></div><p className="intro">Move through a city by relation rather than category. Select any entity and the cultural world reorganizes around it.</p></section>
-  <section className="workspace">
-   <div className="graph">
-    <div className="graphTop"><span>CONSTELLATION / FOCUS: {current.name}</span><span>{nodes.length} ENTITIES / {edges.length} RELATIONS</span></div>
-    <svg className="lines" viewBox="0 0 100 100" preserveAspectRatio="none">{edges.map(e=>{let A=positions[e.source],B=positions[e.target],on=e.source===selected||e.target===selected,show=visible.has(e.source)&&visible.has(e.target);return show?<line key={e.id} x1={A.x} y1={A.y} x2={B.x} y2={B.y} className={on?'activeLine':''}/>:null})}</svg>
-    {nodes.map(n=>{let p=positions[n.id],level=n.id===selected?'selected':near.one.includes(n.id)?'related':visible.has(n.id)?'second':'hidden';return <button aria-label={n.name} key={n.id} onClick={()=>choose(n.id)} className={`node ${level}`} style={{left:p.x+'%',top:p.y+'%'}}><b>{n.name}</b><small>{n.type}</small></button>})}
-    <div className="legend"><span><i className="dot documented"/>DOCUMENTED</span><span><i className="dot reconstructed"/>RECONSTRUCTED</span></div>
-    <div className="hint">SELECT AN ENTITY · THE WORLD REORIENTS AROUND IT</div>
-   </div>
-   <aside>
-    <p className="meta">{current.type} · {current.year}</p><h2>{current.name}</h2><p className="desc">{current.desc}</p><div className={`status ${current.status.toLowerCase()}`}><span></span>{current.status}</div>
-    <div className="actions"><button className={panel==='why'?'on':''} onClick={()=>setPanel('why')}>WHY</button><button className={panel==='source'?'on':''} onClick={()=>setPanel('source')}>SOURCE</button><button className={panel==='overview'?'on':''} onClick={()=>setPanel('overview')}>EXPLORE</button></div>
-    {panel==='overview'&&<><div className="source"><small>CONTEXT</small><p>{connected.length} direct relations in the current cultural graph. Choose a connected entity to continue through the world.</p></div><div className="connections"><small>CONNECTED TO</small>{connected.slice(0,7).map(e=>{let id=e.source===selected?e.target:e.source,n=byId(id);return <button key={e.id} onClick={()=>choose(id)}><span><b>{n.name}</b><em>{e.relation}</em></span><strong>↗</strong></button>})}</div></>}
-    {panel==='why'&&<div className="evidence"><small>RELATION PATHS</small>{connected.slice(0,5).map(e=>{let n=byId(e.source===selected?e.target:e.source);return <div key={e.id}><p className="path">{current.name} <i>→ {e.relation} →</i> {n.name}</p><p>{e.why}</p></div>})}</div>}
-    {panel==='source'&&<div className="evidence"><small>SOURCE LAYER</small><p>{current.source}</p><div className="sourceCard"><span>ATLAS STATUS</span><b>{current.status}</b><p>{current.status==='DOCUMENTED'?'This entity is grounded in public historical record. Precise archival citations are the next research layer.':'This entity is an ATLAS synthesis derived from documented context. It must remain visibly distinct from direct historical fact.'}</p></div></div>}
-   </aside>
+  <header><div className="brand">ATLAS <span>/ CULTURAL WORLD MODELS</span></div><div>VISUAL PROTOTYPE 0.3</div></header>
+  <section className="intro"><div><p className="eyebrow">BERLIN / CULTURAL ROUTE 01</p><h1>Explore how<br/>culture connects.</h1></div><div className="manifesto">Start with something you know.<br/><b>End somewhere you never expected.</b><br/><button onClick={takeMe}>TAKE ME SOMEWHERE ↗</button></div></section>
+
+  <section className="universe">
+   <div className="hud"><span>FAR</span><input aria-label="semantic zoom" type="range" min="0" max="2" step="1" value={zoom} onChange={e=>setZoom(+e.target.value)}/><span>CLOSE</span><b>SEMANTIC ZOOM {zoom+1}/3</b></div>
+   <svg className="lines" viewBox="0 0 100 100" preserveAspectRatio="none">{relations.map((r,i)=>{const a=byId[r.from],b=byId[r.to];return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} className={(r.from===active||r.to===active)?'hot':''}/>})}</svg>
+   {visible.map((a,i)=><button key={a.id} onClick={()=>visit(a.id)} className={'artifact '+(a.id===active?'active ':'')+(a.id===nextSurprise.id?'surprise ':'')} style={{left:`${50+a.dx}%`,top:`${50+a.dy}%`,transform:`translate(-50%,-50%) scale(${a.scale})`,zIndex:a.id===active?8:2}}>
+      <img src={a.image} alt=""/><span className="artifactMeta"><b>{a.title}</b><small>{a.year} · {a.type}</small></span>{a.id===nextSurprise.id&&a.id!==active?<em>WHY IS THIS HERE?</em>:null}
+   </button>)}
+   <div className="worldLabel"><small>YOU ARE HERE</small><strong>{item.title}</strong><span>{item.year}</span></div>
   </section>
-  <section className="search"><span>ASK / SEARCH ATLAS</span><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Try: Detroit, typography, club fashion, temporary space…"/>{query&&<div className="results">{filtered.map(n=><button key={n.id} onClick={()=>{choose(n.id);setQuery('')}}><b>{n.name}</b><span>{n.type} · {n.year}</span></button>)}</div>}</section>
-  <footer><span>ATLAS / CULTURAL WORLD MODELS</span><span>WHAT WE KNOW · WHAT WE INFER · WHAT WE IMAGINE</span></footer>
+
+  <section className="inspector">
+   <div className="heroArtifact"><img src={item.image} alt=""/><span className={'badge '+item.status.toLowerCase()}>{item.status}</span><span className="rights">{item.rights}</span></div>
+   <div className="info"><p className="eyebrow">{item.type} / {item.year}</p><h2>{item.title}</h2><p className="caption">{item.caption}</p><nav>{['WHY','SOURCE','EXPLORE'].map(x=><button className={panel===x?'selected':''} onClick={()=>setPanel(x)} key={x}>{x}</button>)}</nav>
+    {panel==='WHY'&&<div className="panel"><p className="panelTitle">WHY IT CONNECTS</p>{related.map((r,i)=><button className="relation" key={i} onClick={()=>visit(r.from===active?r.to:r.from)}><span>{r.from===active?byId[r.to].title:byId[r.from].title}</span><b>{r.label} ↗</b><small>{r.why}</small></button>)}</div>}
+    {panel==='SOURCE'&&<div className="panel source"><p className="panelTitle">PROVENANCE / RIGHTS</p><p>{item.source}</p><dl><dt>Knowledge status</dt><dd>{item.status}</dd><dt>Visual rights</dt><dd>{item.rights}</dd><dt>Prototype rule</dt><dd>Never infer reuse rights from availability. Verify object-level rights before publishing archival media.</dd></dl></div>}
+    {panel==='EXPLORE'&&<div className="panel"><p className="panelTitle">CONNECTED WORLDS</p>{related.map((r,i)=>{const id=r.from===active?r.to:r.from;return <button className="explore" onClick={()=>visit(id)} key={i}><img src={byId[id].image} alt=""/><span>{byId[id].title}<small>{r.label}</small></span><b>↗</b></button>})}</div>}
+   </div>
+  </section>
+
+  <section className="journey"><div><p className="eyebrow">YOUR JOURNEY</p><h3>{trail.length} cultural stops</h3></div><div className="filmstrip">{trail.map((id,i)=><button key={i} onClick={()=>setActive(id)}><img src={byId[id].image} alt=""/><span>{String(i+1).padStart(2,'0')} {byId[id].title}</span></button>)}</div><button className="save" onClick={()=>alert('Journey saved — prototype interaction')}>SAVE JOURNEY</button></section>
+  <footer><span>ATLAS 0.3</span><span>LOOK → NOTICE → APPROACH → ENTER → EMERGE SOMEWHERE ELSE</span><span>© PROTOTYPE</span></footer>
  </main>
 }
